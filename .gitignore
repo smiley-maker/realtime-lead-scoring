@@ -214,6 +214,7 @@ __marimo__/
 data/raw/*.csv
 data/processed/*.parquet
 data/streaming/**/*.parquet
+data/
 
 # Models (can be large)
 models/lead_scoring_model/data/
