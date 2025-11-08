@@ -218,8 +218,9 @@ data/stream/
 data
 
 # Models (can be large)
-models/lead_scoring_model/data/
-models/lead_scoring_model/metadata/
+models/lead_scoring_models
+models/lead_scoring_models
+models/
 
 # Spark
 *.log
