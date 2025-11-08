@@ -14,4 +14,7 @@ conda activate lead-scoring
 
 # Install dependencies
 pip install -r requirements.txt
+
+# If running into java errors:
+conda install -c conda-forge openjdk=17
 ```
