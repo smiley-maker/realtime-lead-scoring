@@ -60,7 +60,7 @@ flowchart TB
 - PySpark DataFrame API
 - Parquet columnar format for efficient I/O
 
-### 2. Model Training (`src/models/train.py`)
+### 2. Model Training (`src/training/train.py`)
 
 **Purpose:** Train and validate a machine learning pipeline for lead scoring.
 
@@ -470,7 +470,7 @@ realtime-lead-scoring/
 ├── src/
 │   ├── data/
 │   │   └── prepare_data.py      # Data preparation
-│   ├── models/
+│   ├── training/
 │   │   └── train.py             # Model training
 │   └── streaming/
 │       └── spark_streaming.py   # Real-time scoring
