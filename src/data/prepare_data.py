@@ -123,7 +123,7 @@ if __name__ == "__main__":
     
     # Save streaming data (repartitioned for simulation)
     print("Saving streaming data (50 partitions for streaming simulation)...")
-    stream_df.repartition(100).write.mode('overwrite').parquet('data/streaming/user_events/')
+    stream_df.repartition(100).write.mode('overwrite').parquet('data/stream/user_events/')
     
     print("\n✅ Data preparation complete!")
     print("  - Training: data/processed/training_data.parquet")

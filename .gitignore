@@ -213,8 +213,9 @@ __marimo__/
 # Data (too large for git)
 data/raw/*.csv
 data/processed/*.parquet
-data/streaming/**/*.parquet
-data/
+data/stream/**/*.parquet
+data/stream/
+data
 
 # Models (can be large)
 models/lead_scoring_model/data/
