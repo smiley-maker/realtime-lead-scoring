@@ -383,7 +383,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Contact
 
-**Your Name** - [jordan.sinclair@du.edu](mailto:jordan.sinclair@du.edu)
+**Jordan Sinclair** - [jordan.sinclair@du.edu](mailto:jordan.sinclair@du.edu)
 
 **Project Link:** [https://github.com/smiley-maker/realtime-lead-scoring](https://github.com/smiley-maker/realtime-lead-scoring)
 
