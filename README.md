@@ -42,14 +42,6 @@ flowchart TB
 
 ## Project Overview
 
-You will also provide a writeup of your project. This should include a high-level description of
-your data. This includes where you found it and what the data represents. You should also
-discuss the ML problem you are trying to solve. This includes what ML algorithms you used and
-how accurate their results were. Some sample results along with the high-level analysis of your
-work would be good to include as well. You should also discuss how you handled the streaming
-section of the project. And lastly, please discuss any issues you ran into from cleaning data to
-applying ML algorithms to streaming
-
 This project identifies whether Zillow site visitors are likely to contact an agent when viewing a listing. In other words, it presents a real time lead scoring pipeline for determining user intent (e.g. just casually looking around, or actually interested in buying/renting). The [dataset](https://www.kaggle.com/datasets/amritachatterjee09/lead-scoring-dataset/) was actually targeted for web interactions for an education company, but I targeted the data towards Zillow with similar intents for course purchase or home buying. The target variable in the updated scenario is whether a user will click the contact agent button or not, making this a binary classification problem where users estimated to contact the agent based on previous interactions may be prioritized by the real estate agent as high interest leads. I used a Random Forest classifier model within a pipeline that included imputing null values with the mean of numeric columns, bucketing, string indexing and one hot encoding on categorical features, and a VectorAssembler to create the features array. 
 
 The baseline Random Forest model pipeline performed well on both the training and validation set (which were gathered from the original training set with and 80/20 split). The overall accuracy was around 87%, and there are details about other metrics collected below. There was consistent training and evaluation accuracy, suggesting the model was not overfit or underfit. Future experimentation is needed to fine tune the model parameters and preprocessing steps. With some additional exploration of the features, I think that removing the city and country columns may improve the accuracy. At first I thought they would be important for a real estate context, but on further inspection both columns have a lot of missing data, and there doesn't seem to be a direct connection between that and whether the user contacts an agent. 
