@@ -5,7 +5,7 @@
 This project implements a Real-Time Lead Prioritization System using a Spark Structured Streaming pipeline to immediately score new user activity with 90% test accuracy. It utilizes a SparkML Random Forest Classifier trained on historical data to predict the probability of lead conversion (contacting an agent).
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![PySpark 3.5.0](https://img.shields.io/badge/pyspark-3.5.0-orange.svg)](https://spark.apache.org/)
+[![PySpark 4.0](https://img.shields.io/badge/pyspark-4.0-orange.svg)](https://spark.apache.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ```mermaid
@@ -13,7 +13,7 @@ flowchart TB
     subgraph data[Data Preparation]
         A[Kaggle Dataset<br/>Lead Scoring CSV] --> B[prepare_data.py]
         B --> C[Training Data<br/>70% - Parquet]
-        B --> D[Streaming Data<br/>30% - 50 partitions]
+        B --> D[Streaming Data<br/>30% - 100 partitions]
     end
     
     subgraph training[Model Training]
@@ -29,8 +29,6 @@ flowchart TB
         H --> J
         J --> K[Scored Leads<br/>with Probabilities]
         K --> L[Console Output]
-        K --> M[Parquet Files]
-        K --> N[Memory Table]
     end
     
     style A fill:#e1f5ff
@@ -38,7 +36,6 @@ flowchart TB
     style K fill:#fff9c4
 ```
 
----
 
 ## Project Overview
 
@@ -49,8 +46,6 @@ The baseline Random Forest model pipeline performed well on both the training an
 The model was used in a real time streaming setup, with data currently being simulated by breaking up the test dataset into 100 batches and saving those as parquet files. The source has a max files setting of 1 to better exemplify real world streaming. The query simply applied the model to the data without performing any aggregates, and the sink currently is set to output in the terminal. The output includes the prediction, prediction probabilities, ground truth, and the id of the user. I would like to explore alternative sinks, such as outputting to a sql table or postgres database that could be used with a model monitoring dashboard for further testing and even retraining policies. 
 
 One pitfall of the current approach is that null values weren't removed from categorical variables during preprocessing. I think this could improve the training, but at the time I thought the null values would be treated as a class even if they were renamed. But, in hindsight I realize that the performance could be improved by aggregating from other non-null data points. For example, the data could be imputed with the most commonly occuring class, or with some data driven choice by comparing similarity to non-null rows. 
-
----
 
 ## Quick Start
 
@@ -94,62 +89,27 @@ python -m src.training.train
 python -m src.streaming.spark_streaming
 ```
 
----
-
-## System Architecture
-```mermaid
-flowchart TB
-    subgraph data[Data Preparation]
-        A[Kaggle Dataset<br/>Lead Scoring CSV] --> B[prepare_data.py]
-        B --> C[Training Data<br/>70% - Parquet]
-        B --> D[Streaming Data<br/>30% - 50 partitions]
-    end
-    
-    subgraph training[Model Training]
-        C --> E[train.py]
-        E --> F[ML Pipeline<br/>Feature Engineering]
-        F --> G[Random Forest<br/>Classifier]
-        G --> H[Trained Model<br/>PipelineModel]
-        G --> I[Metrics<br/>AUC: 0.92]
-    end
-    
-    subgraph streaming[Real-Time Scoring]
-        D --> J[spark_streaming.py]
-        H --> J
-        J --> K[Scored Leads<br/>with Probabilities]
-        K --> L[Console Output]
-        K --> M[Parquet Files]
-        K --> N[Memory Table]
-    end
-    
-    style A fill:#e1f5ff
-    style H fill:#c8e6c9
-    style K fill:#fff9c4
-```
-
-**See [docs/architecture.md](docs/architecture.md) for detailed system design.**
-
----
 
 ## How It Works
 
-### 1. Data Preparation
+### Data Preparation
 
 The pipeline starts by transforming raw Kaggle lead scoring data into training and streaming datasets:
 
 - **Cleans and validates** 9,240 historical lead records
 - **Splits data** into 70% training (6,468 records) and 30% streaming simulation (2,772 records)
 - **Repartitions** streaming data into 100 files to simulate real-time arrival
-- **Saves as Parquet** for efficient columnar storage (5x smaller than CSV)
+- **Saves as Parquet** for efficient columnar storage
+
 ```bash
 python -m src.data.prepare_data
 ```
 
 **Output:**
 - `data/processed/training_data.parquet` - Ready for model training
-- `data/stream/user_events/` - 50 partitioned files for streaming
+- `data/stream/user_events/` - 100 partitioned files for streaming
 
-### 2. Model Training
+### Model Training
 
 Trains a Random Forest classifier within a Spark ML pipeline:
 
@@ -160,11 +120,12 @@ Trains a Random Forest classifier within a Spark ML pipeline:
 - **Status:** Lead status tags
 
 **Pipeline Stages:**
-1. **Imputation** - Fill missing values with mean
+1. **Imputation** - Fill missing values in numerical columns with mean
 2. **Bucketization** - Group property views into bins
-3. **Encoding** - One-hot encode 7 categorical features
+3. **Encoding** - One-hot encode categorical features
 4. **Assembly** - Combine all features into vector
-5. **Classification** - Random Forest (100 trees, depth 10)
+5. **Classification** - Random Forest with default settings (100 trees, depth 10).
+
 ```bash
 python -m src.models.train
 ```
@@ -173,19 +134,19 @@ python -m src.models.train
 - `models/lead_scoring_model/` - Trained pipeline (all transformations + model)
 - `models/metrics/training_metrics.json` - Performance metrics
 
-### 3. Real-Time Scoring
+### Real-Time Scoring
 
 Processes streaming data using Spark Structured Streaming:
 
-- **Reads** partitioned files one at a time (simulates real-time events)
+- **Reads** partitioned test files one at a time (simulates real-time events)
 - **Applies** the complete ML pipeline (feature engineering + prediction)
-- **Scores** each lead with conversion probability
+- **Scores** each lead with conversion probability (binary classification)
 - **Outputs** to console (additional sinks in progress)
+
 ```bash
 python -m src.streaming.spark_streaming
 ```
 
----
 
 ## Project Structure
 ```
@@ -201,13 +162,13 @@ realtime-lead-scoring/
 │       └── spark_streaming.py   # Real-time scoring
 ├── data/
 │   ├── raw/                     # Original Kaggle dataset
-│   ├── processed/               # Training data (parquet)
-│   └── streaming/               # Streaming simulation data
+│   ├── processed/               # Training data
+│   └── stream/               # Streaming simulation data
 ├── models/
 │   ├── lead_scoring_model/      # Trained ML pipeline
 │   └── metrics/                 # Model performance metrics
 ├── notebooks/
-│   └── exploratory_analysis.ipynb  # Data exploration
+│   └── exploratory_analysis.ipynb  # Data exploration and model tests
 ├── docs/
 │   ├── architecture.md          # System architecture details
 │   └── model_card.md            # Model documentation
@@ -215,59 +176,34 @@ realtime-lead-scoring/
     └── monitor_leads.py         # Query streaming results
 ```
 
----
-
-## Key Features
-
-### Production-Ready ML Pipeline
-- **Complete feature engineering** embedded in saved model
-- **Handles missing data** with automatic imputation
-- **Consistent transformations** between training and scoring
-- **Serialized pipeline** for easy deployment
-
-### Real-Time Streaming
-- **Spark Structured Streaming** for scalable event processing
-- **Micro-batch processing** with configurable trigger intervals
-
-### Professional Documentation
-- **Model card** following industry standards
-- **Architecture documentation** with detailed diagrams
-- **Clear code structure** with comprehensive docstrings
-- **Performance metrics** tracked and saved
-
----
-
 ## Model Performance
 
 | Metric    | Value | Interpretation |
 |-----------|-------|----------------|
-| **AUC-ROC** | 0.92  | Excellent discrimination between high/low priority leads |
-| **Accuracy** | 0.90  | Correctly classifies 90% of leads |
+| **AUC-ROC** | 0.96  | Excellent discrimination between high/low priority leads |
+| **Accuracy** | 0.85  | Correctly classifies 85% of leads |
 | **Precision** | 0.88  | 88% of predicted high-priority leads are truly high-priority |
-| **Recall** | 0.89  | Captures 89% of actual high-priority leads |
+| **Recall** | 0.86  | Captures 86% of actual high-priority leads |
 
 ### Business Impact
 
 With this model, real estate agents can:
-- **Focus on qualified leads** - Prioritize outreach to buyers with 92% probability of contact
-- **Save time** - Reduce wasted effort on low-intent browsers
-- **Increase conversion** - Higher contact rates lead to more closed deals
-- **Data-driven decisions** - Replace gut feelings with ML-powered insights
+- **Focus on qualified leads** - Prioritize contacts with higher probability (e.g. higher purchase intent)
+- **Save time** - Reduce wasted effort on low-intent browsers, those who contacted but the model showed a low probability. 
+- **Increase conversion** - Prioritizing outraech to high intent contacts leads to more closed deals. 
 
----
 
 ## Technology Stack
 
 | Category | Technology | Purpose |
 |----------|-----------|---------|
 | **Language** | Python 3.10 | Primary development language |
-| **Processing** | PySpark 3.5.0 | Distributed data processing & ML |
+| **Processing** | PySpark 4.0 | Distributed data processing & ML |
 | **ML Framework** | Spark MLlib | Machine learning pipelines |
 | **Data Format** | Parquet | Efficient columnar storage |
 | **Environment** | Conda | Package management |
 | **Version Control** | Git/GitHub | Code versioning |
 
----
 
 ## Scaling to Production
 
@@ -287,43 +223,22 @@ flowchart LR
     C --> G[S3 Data Lake]
 ```
 
-**Infrastructure:**
-- **Compute:** AWS EMR or Databricks (8-32 cores)
+**Potential Infrastructure:**
+- **Compute:** AWS EMR or Databricks
 - **Streaming:** Apache Kafka for event ingestion
 - **Storage:** S3 for model artifacts and data lake
 - **Database:** RDS PostgreSQL for real-time lead scores
-- **Monitoring:** Grafana + PagerDuty for alerts
+- **Monitoring:** Grafana for monitoring and alerts
 
 **See [docs/architecture.md](docs/architecture.md) for full production architecture.**
 
----
 
-## 📚 Documentation
+## Documentation
 
 - **[Architecture Documentation](docs/architecture.md)** - Detailed system design, data flows, and production considerations
 - **[Model Card](docs/model_card.md)** - Complete model documentation following industry standards
 
----
 
-## Testing & Validation
-
-### Model Validation
-- 80/20 train/validation split
-- Cross-validation during hyperparameter tuning
-- Holdout test set for final evaluation
-
-### Data Quality Checks
-- Schema validation during data loading
-- Missing value handling with imputation
-- Outlier detection in feature distributions
-
-### Future Testing Plans
-- [ ] Unit tests for data transformations
-- [ ] Integration tests for pipeline
-- [ ] Performance benchmarks for streaming latency
-- [ ] A/B testing framework for model comparison
-
----
 
 ## Future Enhancements
 
@@ -345,7 +260,6 @@ flowchart LR
 - [ ] Automated retraining pipeline
 - [ ] Real-time feature store integration
 
----
 
 ## Contributing
 
@@ -357,21 +271,18 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
----
 
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
----
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - **Dataset:** [Kaggle Lead Scoring Dataset](https://www.kaggle.com/datasets/amritachatterjee09/lead-scoring-dataset/)
 - **Framework:** Apache Spark and PySpark MLlib
 - **Inspiration:** Real-world lead scoring systems at companies like Zillow, Apartments.com, Redfin, and Realtor.com. 
 
----
 
 ## Contact
 
@@ -383,7 +294,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Portfolio:** [https://www.jordan-sinclair.com/](https://www.jordan-sinclair.com/)
 
----
 
 ## Star History
 

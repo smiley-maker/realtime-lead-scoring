@@ -10,7 +10,7 @@ flowchart TB
     subgraph data[Data Preparation]
         A[Kaggle Dataset<br/>Lead Scoring CSV] --> B[prepare_data.py]
         B --> C[Training Data<br/>70% - Parquet]
-        B --> D[Streaming Data<br/>30% - 50 partitions]
+        B --> D[Streaming Data<br/>30% - 100 partitions]
     end
     
     subgraph training[Model Training]
@@ -26,8 +26,6 @@ flowchart TB
         H --> J
         J --> K[Scored Leads<br/>with Probabilities]
         K --> L[Console Output]
-        K --> M[Parquet Files]
-        K --> N[Memory Table]
     end
     
     style A fill:#e1f5ff
@@ -43,18 +41,18 @@ flowchart TB
 
 **Key Operations:**
 - Load CSV with explicit schema (handles spaces in column names)
-- Rename columns to clean, business-friendly names
+- Rename columns to fit Zillow application
 - Select relevant features for modeling
 - Drop records without target labels
 - Split into training (70%) and streaming (30%) sets
-- Repartition streaming data into 50 partitions for simulation
+- Repartition streaming data into 100 partitions for simulation
 
 **Inputs:**
 - `data/raw/Lead Scoring.csv` - Raw Kaggle dataset
 
 **Outputs:**
 - `data/processed/training_data.parquet` - Training dataset
-- `data/streaming/user_events/` - 50 parquet files for streaming simulation
+- `data/streaming/user_events/` - 100 parquet files for streaming simulation
 
 **Technologies:**
 - PySpark DataFrame API
@@ -68,7 +66,7 @@ flowchart TB
 ```mermaid
 flowchart TD
     A[Raw Features] --> B[Imputer]
-    B -->|Fill NULLs| C[Bucketizer]
+    B -->|Fill NULLs in Numeric Cols| C[Bucketizer]
     C -->|TotalVisits → Buckets| D[String Indexers]
     
     D --> E[LeadCaptureChannel]
@@ -118,11 +116,14 @@ flowchart TD
 - `models/lead_scoring_model/` - Serialized PipelineModel
 - `models/metrics/training_metrics.json` - Performance metrics
 
+
 **Model Performance:**
-- AUC-ROC: 0.92
-- Accuracy: 0.90
-- Precision: 0.88
-- Recall: 0.89
+| Metric    | Value | Interpretation |
+|-----------|-------|----------------|
+| **AUC-ROC** | 0.96  | Excellent discrimination between high/low priority leads |
+| **Accuracy** | 0.85  | Correctly classifies 85% of leads |
+| **Precision** | 0.88  | 88% of predicted high-priority leads are truly high-priority |
+| **Recall** | 0.86  | Captures 86% of actual high-priority leads |
 
 ### 3. Real-Time Scoring (`src/streaming/spark_streaming.py`)
 
@@ -131,8 +132,8 @@ flowchart TD
 **Streaming Architecture:**
 ```mermaid
 flowchart TD
-    A[Streaming Parquet<br/>50 files, 2,772 records] --> B[Spark readStream]
-    B -->|maxFilesPerTrigger=1| C[Micro-batch<br/>~55 records]
+    A[Streaming Parquet<br/>100 files, 2,772 records] --> B[Spark readStream]
+    B -->|maxFilesPerTrigger=1| C[Micro-batch<br/>~28 records]
     
     D[Trained Pipeline<br/>from models/] --> E[Load Model]
     
@@ -148,10 +149,8 @@ flowchart TD
     J -->|probability ≤ 0.7| L[Regular Leads]
     
     K --> M[Console Output]
-    K --> N[Parquet Files<br/>output/scored_leads/]
-    K --> O[Memory Table<br/>high_priority_leads]
     
-    L --> N
+    L --> M
     
     style A fill:#e1f5ff
     style E fill:#c8e6c9
@@ -159,27 +158,6 @@ flowchart TD
     style L fill:#f0f4c3
 ```
 
-**Key Design Decisions:**
-
-1. **File-based streaming source**
-   - Simulates real-time event arrival
-   - `maxFilesPerTrigger=1` processes one partition at a time
-   - In production: Replace with Kafka or Kinesis
-
-2. **Model as PipelineModel**
-   - All feature engineering embedded in saved model
-   - No need to rebuild transformations
-   - Ensures training/serving consistency
-
-3. **Multiple output sinks**
-   - Console for demonstration
-   - Parquet for persistence and analysis
-   - Memory table for interactive queries
-
-**Streaming Guarantees:**
-- **Processing mode:** Micro-batch (not continuous)
-- **Delivery semantics:** At-least-once (can duplicate on failure)
-- **Checkpointing:** Enabled for fault tolerance
 
 ## Data Flow
 
@@ -197,7 +175,7 @@ flowchart LR
     G --> H[Trained Model]
     
     F --> I[Evaluate Model]
-    I --> J[Metrics<br/>AUC: 0.92<br/>Accuracy: 0.90]
+    I --> J[Metrics<br/>AUC: 0.96<br/>Accuracy: 0.85]
     
     H --> K[Save to<br/>models/]
     J --> L[Save to<br/>metrics.json]
@@ -209,22 +187,20 @@ flowchart LR
 
 ### Streaming Data Flow
 ```
-Streaming Parquet (50 files, 2,772 records)
+Streaming Parquet (100 files, 2,772 records)
     ↓ [Read maxFilesPerTrigger=1]
-Micro-batch (~55 records)
-    ↓ [Apply Pipeline]
+Micro-batch (~28 records)
+    ↓ [Apply Pipeline Model]
 Scored Leads (with probabilities)
-    ↓ [Filter & Format]
-High-Priority Leads (probability > 0.7)
-    ↓ [Write to Sinks]
-Console | Parquet | Memory Table
+    ↓ [Write to Sink]
+Console
 ```
 
 ## Technology Stack
 
 ### Core Technologies
 - **Python 3.10** - Primary language
-- **PySpark 3.5.0** - Distributed data processing
+- **PySpark 4.0** - Distributed data processing
 - **Apache Spark MLlib** - Machine learning pipelines
 
 ### Data Formats
@@ -236,35 +212,6 @@ Console | Parquet | Memory Table
 - **Git/GitHub** - Version control
 - **Jupyter** - Exploratory analysis
 
-## Design Decisions & Rationale
-
-### Why Spark?
-- **Scalability:** Can handle millions of events/day with cluster deployment
-- **Unified API:** Same code for batch training and stream scoring
-- **Production-ready:** Battle-tested at companies like Zillow, Airbnb, Netflix
-
-### Why Random Forest?
-- **Interpretability:** Feature importance helps business understand drivers
-- **Robustness:** Handles missing data and mixed feature types well
-- **Performance:** Achieves 92% AUC with minimal tuning
-- **Speed:** Fast inference for real-time scoring
-
-### Why Parquet?
-- **5-10x faster** than CSV for reads
-- **5x smaller** on disk (compression)
-- **Schema preservation:** No type inference needed
-- **Columnar:** Only reads needed columns
-
-### Why File-based Streaming?
-- **Simplicity:** No external dependencies (Kafka, etc.)
-- **Portability:** Easy to demo on laptop
-- **Realistic:** Many production systems read from S3/GCS with file triggers
-
-### Why Separate Train/Stream?
-- **Realism:** Simulates production where training is batch, scoring is real-time
-- **Testability:** Can evaluate each component independently
-- **Scalability:** Different resource requirements (training needs more compute)
-
 ## Production Considerations
 
 ### Scalability
@@ -272,12 +219,11 @@ Console | Parquet | Memory Table
 **Current (Local Dev):**
 - Single machine
 - ~9K records
-- ~1 second per micro-batch
+- ~5 second per micro-batch
 
 **Production (Zillow Scale):**
-- EMR/Databricks cluster (8-32 cores)
+- Databricks cluster
 - Millions of events/day
-- <100ms latency per batch
 - Auto-scaling based on event volume
 
 ### Production Deployment Architecture (Recommended)
@@ -291,7 +237,7 @@ flowchart TB
     A --> C[Kafka Topic<br/>user-events]
     B --> C
     
-    C --> D[Spark Streaming<br/>EMR/Databricks Cluster]
+    C --> D[Spark Streaming<br/>Databricks Cluster]
     
     E[S3 Bucket<br/>Model Artifacts] --> D
     
@@ -307,11 +253,9 @@ flowchart TB
     
     subgraph monitoring[Monitoring]
         L[Grafana<br/>Real-time Metrics]
-        M[PagerDuty<br/>Alerts]
     end
     
     D -.->|Metrics| L
-    D -.->|Errors| M
     
     style C fill:#e1f5ff
     style D fill:#c8e6c9
@@ -322,24 +266,14 @@ flowchart TB
 ### Infrastructure Requirements
 
 **Compute:**
-- Spark cluster: 8-32 cores (EMR/Databricks)
-- Driver: 4GB RAM
-- Executors: 8GB RAM each
+- Spark cluster: Databricks
 
 **Storage:**
-- S3/GCS for data lake and model artifacts
+- S3 for data lake and model artifacts
 - RDS/PostgreSQL for real-time lead scores
-- ~500GB/month data retention
 
 **Network:**
-- Kafka/Kinesis for event ingestion
-- VPC with private subnets for Spark cluster
-
-**Cost Estimate:**
-- EMR cluster: ~$1,000-2,000/month
-- S3 storage: ~$50/month
-- RDS: ~$200/month
-- **Total: ~$1,500-2,500/month** for 100K events/second
+- Kafka for event ingestion
 
 ### Monitoring & Observability
 
@@ -361,14 +295,10 @@ flowchart TB
    - Error rate
    - Resource utilization (CPU, memory)
 
-**Alerting:**
-- PagerDuty for critical failures
-- Slack for warnings (drift, performance degradation)
-- Email for daily summaries
 
 **Dashboards:**
 - Grafana for real-time metrics
-- Looker/Tableau for business metrics
+- Tableau for business metrics
 - Spark UI for job monitoring
 
 ### Retraining Pipeline
@@ -377,7 +307,7 @@ flowchart TD
     A[Daily Schedule<br/>2 AM UTC] --> B[Airflow DAG Trigger]
     
     B --> C[Extract Data<br/>Last 30 days]
-    C --> D[Data Warehouse<br/>Redshift/BigQuery]
+    C --> D[Data Warehouse<br/>Redshift]
     
     D --> E[Prepare Features<br/>Same as training]
     E --> F[Train New Model<br/>Random Forest]
@@ -421,22 +351,6 @@ flowchart TD
    - Compare champion vs challenger
    - Full deployment if validated
 
-## Security Considerations
-
-### Data Privacy
-- Pseudonymized user IDs (no PII in model features)
-- Encrypted at rest (S3 encryption)
-- Encrypted in transit (TLS for Kafka)
-
-### Access Control
-- IAM roles for Spark cluster (least privilege)
-- VPC isolation for data processing
-- Audit logging for model access
-
-### Compliance
-- GDPR: Right to explanation (feature importance)
-- CCPA: Data deletion upon request
-- SOC 2: Audit logs, access controls
 
 ## Future Enhancements
 
@@ -447,7 +361,7 @@ flowchart TD
 - [ ] Add integration tests
 
 ### Medium-term (6 months)
-- [ ] Deploy to AWS EMR/Databricks
+- [ ] Deploy to Databricks
 - [ ] Integrate with Kafka for true streaming
 - [ ] Add A/B testing framework
 - [ ] Implement model versioning (MLflow and Weights & Biases for experiment tracking)
@@ -458,11 +372,6 @@ flowchart TD
 - [ ] Automated retraining pipeline
 - [ ] Real-time feature store
 
-## References
-
-- [Apache Spark Structured Streaming Programming Guide](https://spark.apache.org/docs/latest/structured-streaming-programming-guide.html)
-- [Spark MLlib Pipeline Documentation](https://spark.apache.org/docs/latest/ml-pipeline.html)
-- [Best Practices for ML Engineering (Google)](https://developers.google.com/machine-learning/guides/rules-of-ml)
 
 ## Appendix: File Structure
 ```
@@ -477,7 +386,7 @@ realtime-lead-scoring/
 ├── data/
 │   ├── raw/                     # Original CSV
 │   ├── processed/               # Training parquet
-│   └── streaming/               # Streaming partitions
+│   └── stream/                  # Streaming partitions
 ├── models/
 │   ├── lead_scoring_model/      # Trained pipeline
 │   └── metrics/                 # Performance metrics

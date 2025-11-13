@@ -6,7 +6,7 @@
 **Version:** 1.0  
 **Date:** November 2025  
 **Developer:** Jordan Sinclair  
-**Framework:** PySpark MLlib 3.5.0  
+**Framework:** PySpark MLlib 4.0  
 **License:** MIT
 
 ### Model Description
@@ -41,12 +41,12 @@ A machine learning pipeline that predicts the likelihood of a prospective homebu
 
 ### Features
 **Behavioral Features:**
-- `TotalVisits` - Number of property listings viewed
+- `TotalVisits` - Number of times the user has visited Zillow
 - `TotalBrowsingTime` - Time spent on website (minutes)
 - `AvgListingsViewedPerSession` - Average properties per session
 
 **Engagement Features:**
-- `LeadCaptureChannel` - How the lead was captured (form, import, etc.)
+- `LeadCaptureChannel` - How the lead was captured (email, browser, etc.)
 - `ReferralSource` - Traffic source (Facebook, referral, etc.)
 - `LastAction` - Most recent user action
 - `FinalEngagementAction` - Last engagement type
@@ -98,18 +98,12 @@ The model performs consistently across:
 5. Vector Assembler (combine all features)
 6. Random Forest Classifier
 
-**Hyperparameters:**
-- Number of trees: 100
-- Max depth: 10
-- Min instances per node: 1 (default)
-- Feature subset strategy: auto
-
 ## Limitations
 
 ### Known Limitations
 
 1. **Temporal drift**: Model trained on historical data may not capture seasonal trends in home buying
-2. **Cold start problem**: New users with minimal browsing history get less accurate scores
+2. **Cold start problem**: New users with minimal browsing history may get less accurate scores
 3. **Geographic bias**: Model may be biased toward cities with more training examples (Mumbai, Delhi)
 4. **Feature limitations**: Doesn't capture external factors (interest rates, housing market conditions)
 5. **Web Behavior Differences**: The dataset was adapted from interacions on an education websites, some differences may be noticed when streaming interactions from Zillow. 
@@ -137,6 +131,7 @@ The model performs consistently across:
 - **Risk**: Model may prioritize leads from certain cities if those leads had higher conversion rates historically
 - **Mitigation**: Monitor lead score distributions across geographic regions
 - **Recommendation**: Periodic audits to ensure equitable lead distribution
+- **Future Plans**: Try training without geographic data and compare performance. 
 
 ### Transparency
 - Feature importance available from Random Forest model
@@ -171,13 +166,6 @@ Retrain model when:
 
 ## Deployment Considerations
 
-### Production Requirements
-
-- **Compute**: Spark cluster with 8+ cores recommended for real-time scoring
-- **Latency**: Target <100ms per batch of leads
-- **Storage**: Model artifacts ~50MB, requires S3/GCS for persistence
-- **Dependencies**: PySpark 3.5+, Java 17
-
 ### A/B Testing
 
 Before full deployment:
@@ -188,7 +176,9 @@ Before full deployment:
 ## Contact & Updates
 
 **Maintained by:** Jordan Sinclair
-**Repository:** https://github.com/smiley-maker/realtime-lead-scoring/tree/main
+
+**Repository:** https://github.com/smiley-maker/realtime-lead-scoring/
+
 **Questions:** jordan.sinclair@du.edu
 
 **Version History:**

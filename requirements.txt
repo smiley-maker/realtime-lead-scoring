@@ -1,16 +1,16 @@
 # Core Spark and ML
-pyspark==3.5.0
+pyspark==4.0.0
 
 # Data Processing
-pandas==2.1.4
-numpy==1.26.2
+pandas==2.3.3
+numpy==2.3.4
 
 # Visualization
-plotly==5.18.0
+plotly==6.4.0
 
 # Jupyter for notebooks
-jupyter==1.0.0
-ipykernel==6.27.1
+jupyter
+ipykernel==7.1.0
 
 # Testing
-pytest==7.4.3
+pytest==9.0.1
